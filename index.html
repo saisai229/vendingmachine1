@@ -500,13 +500,13 @@
         // FIREBASE CONFIGURATION (REPLACE WITH YOUR KEYS)
         // ===================================================
         const firebaseConfig = {
-            apiKey: "YOUR_FIREBASE_API_KEY",
-            authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-            databaseURL: "https://YOUR_PROJECT_ID-default-rtdb.firebaseio.com",
-            projectId: "YOUR_PROJECT_ID",
-            storageBucket: "YOUR_PROJECT_ID.appspot.com",
-            messagingSenderId: "YOUR_SENDER_ID",
-            appId: "YOUR_APP_ID"
+            apiKey: "AIzaSyDIhGCEFAyGoM5NwRge2KXzngkeJOIwdoc",
+            authDomain: "vending-machine01-ccd19.firebaseapp.com",
+            databaseURL: "https://vending-machine01-ccd19-default-rtdb.firebaseio.com",
+            projectId: "vending-machine01-ccd19",
+            storageBucket: "vending-machine01-ccd19.firebasestorage.app",
+            messagingSenderId: "854410226034",
+            appId: "1:854410226034:web:66e0a12d14309554fad5eb"
         };
 
         let db = null;
@@ -790,7 +790,7 @@
         }
 
         function generateDynamicQR(amount) {
-            const upiId = "vendinggo@razorpay";
+            const upiId = "";
             const payeeName = encodeURIComponent("Karthik Shop Vending");
             const upiString = `upi://pay?pa=${upiId}&pn=${payeeName}&am=${amount}&cu=INR&tn=VendingGo_Order`;
             const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(upiString)}`;
