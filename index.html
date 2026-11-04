@@ -1,1 +1,1094 @@
-# vendingmachine1
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VendingGo! - Smart Vending Kiosk</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <!-- Firebase JS SDK (App & Realtime Database) -->
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        vending: {
+                            bg: '#f8faf9',
+                            card: '#ffffff',
+                            header: '#1e3a2b',
+                            headerDark: '#12241b',
+                            accent: '#d97706',
+                            accentLight: '#fef3c7',
+                            textDark: '#0f172a',
+                            textMuted: '#64748b',
+                            border: '#e2e8f0'
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Plus Jakarta Sans', 'sans-serif']
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #0f172a; color: #0f172a; user-select: none; }
+        .screen { display: flex; flex-direction: column; height: 100%; min-height: 100%; }
+        .hidden { display: none !important; }
+        
+        /* Custom scrollbar for kiosk preview */
+        ::-webkit-scrollbar { width: 5px; height: 5px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+        @keyframes dropAnimation {
+            0% { transform: translateY(-120px) scale(0.6) rotate(-10deg); opacity: 0; }
+            60% { transform: translateY(12px) scale(1.08) rotate(3deg); opacity: 1; }
+            80% { transform: translateY(-4px) scale(0.96) rotate(-1deg); }
+            100% { transform: translateY(0) scale(1) rotate(0deg); opacity: 1; }
+        }
+        .item-drop { animation: dropAnimation 0.65s cubic-bezier(0.34, 1.56, 0.64, 1) forwards; }
+        
+        @keyframes pulseGlow {
+            0%, 100% { opacity: 0.4; }
+            50% { opacity: 0.8; }
+        }
+        .pulse-glow { animation: pulseGlow 2s infinite ease-in-out; }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-800 antialiased flex items-center justify-center min-h-screen p-0 sm:p-4">
+
+    <!-- Outer Device Surround (Simulated Kiosk Box on Desktop) -->
+    <div class="w-full max-w-md bg-white shadow-2xl rounded-none sm:rounded-[36px] overflow-hidden flex flex-col h-screen sm:h-[92vh] sm:max-h-[880px] relative border-0 sm:border-[8px] sm:border-slate-800">
+
+        <!-- Top Header Bar -->
+        <header class="bg-vending-header text-white px-5 py-3.5 flex items-center justify-between shadow-lg shrink-0 z-20 border-b border-emerald-900/40">
+            <div class="flex items-center gap-3 cursor-pointer select-none active:scale-95 transition-transform" onclick="handleSecretHeaderTap()">
+                <div class="bg-white/10 p-2 rounded-2xl flex items-center justify-center overflow-hidden w-10 h-10 border border-white/10 shadow-inner" id="header-icon-container">
+                    <i class="fa-solid fa-box-open text-xl text-amber-400" id="header-icon-default"></i>
+                    <img id="header-custom-img" class="w-full h-full object-contain hidden" src="" alt="Logo">
+                </div>
+                <div>
+                    <h1 class="font-extrabold text-base tracking-wide flex items-center gap-1.5" id="main-header-title">
+                        VendingGo!
+                    </h1>
+                    <p class="text-[11px] text-emerald-200/90 font-medium leading-none" id="header-subtitle">Smart Kiosk Platform</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-2">
+                <span class="inline-flex items-center gap-1 text-[10px] bg-emerald-500/20 text-emerald-300 font-bold px-2.5 py-1 rounded-full border border-emerald-400/30">
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> Online
+                </span>
+            </div>
+        </header>
+
+        <!-- Main Content Scrollable Area -->
+        <main class="flex-1 overflow-y-auto relative bg-vending-bg flex flex-col w-full">
+
+            <!-- 1. WELCOME SCREEN -->
+            <div id="welcome-screen" class="screen flex flex-col items-center justify-between px-6 py-8 text-center h-full relative overflow-hidden bg-gradient-to-b from-emerald-900/5 via-vending-bg to-amber-500/5">
+                <div class="absolute -top-16 -right-16 w-52 h-52 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none"></div>
+                <div class="absolute -bottom-16 -left-16 w-52 h-52 bg-amber-500/10 rounded-full blur-3xl pointer-events-none"></div>
+
+                <div class="my-auto relative z-10 flex flex-col items-center w-full">
+                    <div class="w-28 h-28 bg-gradient-to-tr from-vending-header to-emerald-600 rounded-3xl flex items-center justify-center mb-5 shadow-2xl border-4 border-white transform hover:rotate-3 transition duration-300 overflow-hidden relative group" id="welcome-logo-box">
+                        <i class="fa-solid fa-store text-4xl text-white drop-shadow" id="welcome-logo-default"></i>
+                        <img id="welcome-custom-logo" class="w-full h-full object-cover hidden" src="" alt="Welcome Logo">
+                    </div>
+                    
+                    <div id="welcome-badge-text" class="inline-block bg-emerald-100/80 border border-emerald-200 text-emerald-800 text-[10px] font-extrabold px-3 py-1 rounded-full uppercase tracking-widest mb-2 shadow-sm">
+                        Welcome to
+                    </div>
+                    <h2 id="welcome-title-text" class="text-3xl font-black mb-1 text-slate-900 tracking-tight leading-tight">Karthik's Shop</h2>
+                    <p id="welcome-subtitle-text" class="text-xs font-bold text-amber-700 tracking-wide uppercase mb-4 bg-amber-100/70 border border-amber-200/60 px-3 py-1 rounded-xl inline-block">VendingGo! Smart Kiosk</p>
+                    <p id="welcome-desc-text" class="text-vending-textMuted text-xs mb-8 max-w-xs leading-relaxed font-medium">Experience lightning-fast smart vending with instant digital UPI payments & laser dispensing.</p>
+                    
+                    <button onclick="showScreen('catalog-screen')" id="welcome-btn-text" class="w-full max-w-xs bg-vending-header hover:bg-vending-headerDark active:scale-95 text-white font-extrabold py-4 px-8 rounded-2xl shadow-xl hover:shadow-2xl transition-all flex items-center justify-center gap-3 text-sm tracking-wide group border border-emerald-700">
+                        <span id="welcome-btn-label">Start Shopping</span>
+                        <i class="fa-solid fa-arrow-right group-hover:translate-x-1 transition-transform"></i>
+                    </button>
+                </div>
+
+                <div class="text-[11px] text-slate-400 font-medium">
+                    Touch screen to begin order
+                </div>
+            </div>
+
+            <!-- 2. CATALOG SCREEN -->
+            <div id="catalog-screen" class="screen hidden flex flex-col h-full w-full">
+                <!-- Search Header -->
+                <div class="p-4 bg-white border-b border-slate-200 sticky top-0 z-10 shadow-sm">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-2">
+                            <button onclick="resetKiosk()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold px-3 py-1.5 rounded-xl transition flex items-center gap-1.5 border border-slate-200">
+                                <i class="fa-solid fa-house text-emerald-700"></i>
+                                <span>Home</span>
+                            </button>
+                            <h2 id="catalog-title-text" class="font-extrabold text-base text-slate-900">Select Products</h2>
+                        </div>
+                        <span class="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1 border border-emerald-200">
+                            <i class="fa-solid fa-signal text-[9px] animate-pulse"></i> Live Stock
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Product Grid -->
+                <div class="p-4 flex-1 overflow-y-auto pb-28">
+                    <div id="product-grid" class="grid grid-cols-2 gap-3 items-stretch">
+                        <!-- Dynamic Products -->
+                    </div>
+                    <div id="no-products-msg" class="hidden text-center py-12">
+                        <i class="fa-solid fa-box-open text-3xl text-slate-300 mb-2"></i>
+                        <p class="text-xs font-semibold text-slate-500">No items available.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 3. CART SCREEN -->
+            <div id="cart-screen" class="screen hidden p-4 flex flex-col justify-between h-full overflow-y-auto pb-28">
+                <div class="space-y-3">
+                    <div class="flex items-center justify-between border-b border-slate-200 pb-2">
+                        <h2 class="font-extrabold text-base text-slate-900">Cart Summary</h2>
+                        <button onclick="clearCart()" class="text-[11px] font-bold text-red-600 hover:text-red-700">Clear All</button>
+                    </div>
+                    <div id="cart-items-container" class="space-y-2 max-h-[340px] overflow-y-auto pr-1">
+                        <!-- Dynamic Cart Items -->
+                    </div>
+                </div>
+
+                <div id="cart-summary-box" class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm mt-4 space-y-2">
+                    <div class="flex justify-between text-xs text-slate-600">
+                        <span>Items Subtotal:</span>
+                        <span id="cart-subtotal-price" class="font-bold text-slate-800">₹0</span>
+                    </div>
+                    <div class="flex justify-between text-xs text-slate-600">
+                        <span>GST (5%):</span>
+                        <span id="cart-tax-price" class="font-bold text-slate-800">₹0</span>
+                    </div>
+                    <div class="border-t border-slate-200 pt-2 flex justify-between items-center text-sm font-extrabold text-slate-900">
+                        <span>Grand Total:</span>
+                        <span id="cart-grand-total" class="text-emerald-600 text-lg">₹0</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 4. PAYMENT SCREEN -->
+            <div id="payment-screen" class="screen hidden px-5 py-5 flex flex-col items-center justify-between text-center h-full overflow-y-auto pb-28">
+                <div class="w-full">
+                    <!-- Countdown Banner -->
+                    <div class="bg-amber-50 border border-amber-200 p-2.5 rounded-2xl mb-3 flex flex-col items-center gap-1 shadow-sm">
+                        <div class="flex items-center gap-2 text-amber-800 text-xs font-extrabold">
+                            <i class="fa-solid fa-clock animate-spin text-amber-600"></i>
+                            <span>Time Left: <span id="timer" class="text-sm text-red-600 font-black">100</span>s</span>
+                        </div>
+                        <div class="w-full bg-amber-200 h-1.5 rounded-full overflow-hidden">
+                            <div id="timer-bar" class="bg-amber-600 h-full w-full transition-all duration-1000"></div>
+                        </div>
+                    </div>
+                    
+                    <h2 class="font-extrabold text-base text-slate-900 mb-0.5">Scan QR to Pay</h2>
+                    
+                    <!-- Timer Urgent Warning Box -->
+                    <div class="bg-red-50 border border-red-200 text-red-700 text-[11px] font-extrabold px-3 py-1.5 rounded-xl mb-3 animate-pulse shadow-sm flex items-center justify-center gap-1.5">
+                        <i class="fa-solid fa-triangle-exclamation text-xs"></i>
+                        <span>Please Complete Your Payment Before Timer Expires!</span>
+                    </div>
+
+                    <p class="text-[11px] text-slate-500 mb-3">Compatible with PhonePe, Google Pay, Paytm & UPI Apps</p>
+
+                    <!-- Dynamic QR Card -->
+                    <div class="bg-white p-4 rounded-3xl shadow-md border border-slate-200 mb-3 inline-block relative group">
+                        <div id="qr-code-box" class="w-48 h-48 bg-slate-50 border-2 border-dashed border-slate-300 rounded-2xl flex flex-col items-center justify-center p-2 relative overflow-hidden">
+                            <img id="dynamic-qr-img" class="w-40 h-40 object-contain" src="" alt="Dynamic UPI QR Code">
+                            <div class="absolute bottom-1 bg-emerald-700 text-white text-[11px] font-extrabold px-3 py-0.5 rounded-full shadow" id="qr-amount-badge">₹0</div>
+                        </div>
+                    </div>
+
+                    <!-- UPI Quick Launch Badges -->
+                    <div class="flex justify-center gap-2 mb-4">
+                        <span class="text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200 px-2.5 py-1 rounded-xl">PhonePe</span>
+                        <span class="text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200 px-2.5 py-1 rounded-xl">GPay</span>
+                        <span class="text-[10px] font-bold bg-cyan-50 text-cyan-700 border border-cyan-200 px-2.5 py-1 rounded-xl">Paytm</span>
+                    </div>
+
+                    <button onclick="retryPaymentCheck()" class="w-full max-w-xs bg-amber-600 hover:bg-amber-700 active:scale-95 text-white font-extrabold py-3 px-5 rounded-2xl shadow-lg transition text-xs flex items-center justify-center gap-2 border border-amber-500">
+                        <i class="fa-solid fa-rotate-right text-sm"></i>
+                        <span>Re-Check Payment Status (Retry)</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- 5. DISPENSING SCREEN -->
+            <div id="dispensing-screen" class="screen hidden p-5 flex flex-col items-center justify-between text-center h-full overflow-y-auto">
+                <div class="w-full flex flex-col items-center my-auto pb-16">
+                    <!-- Sensor Indicator -->
+                    <div class="w-16 h-16 bg-emerald-100 rounded-2xl flex items-center justify-center mb-3 shadow-inner border border-emerald-200">
+                        <i class="fa-solid fa-box-open text-3xl text-emerald-600 animate-bounce"></i>
+                    </div>
+                    <h2 class="text-lg font-extrabold text-slate-900 mb-4">Dispensing Items...</h2>
+                    
+                    <!-- Progress Step Monitor -->
+                    <div id="dispense-sensor-status" class="w-full max-w-xs bg-white border border-slate-200 text-slate-800 text-xs font-bold p-3 rounded-2xl mb-3 flex items-center justify-center gap-2 shadow-sm">
+                        <i class="fa-solid fa-circle-notch animate-spin text-emerald-600"></i>
+                        <span id="sensor-status-msg">Product Dropped: 0 / 0</span>
+                    </div>
+
+                    <!-- Hidden Hardware Fault Toggle -->
+                    <input type="checkbox" id="sensor-fault-toggle" class="hidden">
+
+                    <!-- Stuck Alert Box -->
+                    <div id="refund-alert-box" class="w-full max-w-xs bg-red-50 border border-red-200 text-red-700 text-xs font-bold p-3 rounded-2xl mb-4 hidden text-left space-y-1 shadow-sm">
+                        <div class="flex items-center gap-1.5 text-red-800 font-extrabold">
+                            <i class="fa-solid fa-triangle-exclamation text-sm"></i>
+                            <span>Item Jammed / Stuck Detected!</span>
+                        </div>
+                        <p id="stuck-item-details" class="text-[10px] font-normal text-red-600 leading-tight">Product failed to drop across the laser beam sensor.</p>
+                        <div class="inline-block bg-red-600 text-white text-[9px] px-2 py-0.5 rounded font-extrabold uppercase tracking-wider mt-1">
+                            Auto Refund Processed
+                        </div>
+                    </div>
+
+                    <!-- Physical Drop Slot Visualizer -->
+                    <div class="w-full bg-slate-900 border-4 border-slate-700 rounded-3xl p-4 min-h-[140px] flex items-center justify-center gap-3 flex-wrap relative shadow-2xl overflow-hidden mb-3" id="dispensed-items-container">
+                        <div class="absolute inset-0 bg-gradient-to-b from-black/60 via-transparent to-black/20 pointer-events-none"></div>
+                        <span class="text-[10px] font-bold text-slate-500 absolute top-2 left-3 tracking-widest uppercase">DISPENSING TRAY</span>
+                    </div>
+
+                    <!-- Pickup Instruction Box -->
+                    <div id="collect-products-box" class="w-full bg-emerald-50 border-2 border-emerald-500 rounded-3xl p-6 text-center shadow-lg hidden mb-3">
+                        <i class="fa-solid fa-hand-holding-hand text-4xl text-emerald-600 mb-2 animate-bounce"></i>
+                        <h3 class="text-base font-black text-slate-900">Collect Your Products!</h3>
+                        <p class="text-xs font-bold text-emerald-700 mt-1 mb-4">Please collect your products from the dispensing box tray below.</p>
+                        <button onclick="resetKiosk()" class="bg-vending-header hover:bg-vending-headerDark active:scale-95 text-white font-extrabold px-6 py-2.5 rounded-2xl text-xs shadow-md transition inline-flex items-center gap-2">
+                            <i class="fa-solid fa-house"></i>
+                            <span>Back to Home Page</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 6. RECEIPT SCREEN -->
+            <div id="receipt-screen" class="screen hidden p-5 flex flex-col items-center justify-center text-center h-full overflow-y-auto pb-28">
+                <div class="w-full max-w-xs my-auto flex flex-col items-center">
+                    <div class="w-14 h-14 bg-emerald-100 rounded-full flex items-center justify-center mb-3 shadow-inner text-emerald-600 border border-emerald-200">
+                        <i class="fa-solid fa-receipt text-2xl"></i>
+                    </div>
+                    <h3 class="font-extrabold text-lg text-slate-900 mb-0.5">Digital Receipt</h3>
+                    <p class="text-xs text-slate-500 mb-2">Thank you for shopping with us!</p>
+                    <p class="text-[10px] text-amber-700 font-extrabold bg-amber-50 px-3 py-1 rounded-full mb-3 border border-amber-200">
+                        Redirecting Home in <span id="receipt-timer">10</span>s...
+                    </p>
+
+                    <!-- Receipt Paper Card -->
+                    <div class="bg-white border border-slate-200 rounded-2xl p-4 w-full text-left text-xs mb-4 shadow-sm relative font-mono">
+                        <div class="flex justify-between border-b border-dashed border-slate-300 pb-2 mb-2 font-bold text-slate-700">
+                            <span>ID: <span id="receipt-tx-id"></span></span>
+                            <span id="receipt-timestamp" class="text-[10px] font-normal text-slate-500"></span>
+                        </div>
+                        <div id="receipt-items-list" class="space-y-1 mb-2"></div>
+                        <div class="border-t border-dashed border-slate-300 pt-2 flex justify-between font-extrabold text-slate-900 text-sm">
+                            <span>Total Paid:</span>
+                            <span id="receipt-final-total" class="text-emerald-600">₹0</span>
+                        </div>
+                    </div>
+
+                    <button onclick="printReceiptSim()" class="text-xs font-bold text-slate-600 hover:text-slate-800 flex items-center gap-1.5 mb-2">
+                        <i class="fa-solid fa-print"></i> Print Simulated Receipt
+                    </button>
+                </div>
+            </div>
+
+            <!-- 7. ADMIN SCREEN -->
+            <div id="admin-screen" class="screen hidden p-4 flex-1 overflow-y-auto">
+                <div class="flex items-center justify-between mb-3 border-b border-slate-200 pb-2">
+                    <h2 class="font-extrabold text-base text-slate-900">Admin Control Panel</h2>
+                    <button onclick="showScreen('catalog-screen')" class="bg-red-500 hover:bg-red-600 text-white text-[11px] font-bold px-3 py-1 rounded-xl transition">
+                        Close
+                    </button>
+                </div>
+
+                <!-- Web Serial USB Status Indicator -->
+                <div class="mb-3 p-3 rounded-2xl bg-slate-100 border border-slate-200 text-xs space-y-2">
+                    <div class="flex items-center justify-between">
+                        <span class="font-bold text-slate-700 flex items-center gap-2">
+                            <i class="fa-solid fa-plug text-slate-400" id="admin-usb-icon"></i>
+                            <span id="admin-usb-status">ESP32 Status: Disconnected</span>
+                        </span>
+                        <button onclick="connectESP32Serial()" class="text-[10px] bg-slate-800 hover:bg-black text-white px-3 py-1.5 rounded-xl font-bold transition shadow-sm">Connect USB</button>
+                    </div>
+                    <!-- Serial Output Terminal -->
+                    <div class="bg-slate-900 text-emerald-400 p-2 rounded-xl text-[10px] font-mono h-20 overflow-y-auto" id="serial-terminal-log">
+                        > System initialized. Ready for USB Serial output...
+                    </div>
+                </div>
+
+                <!-- Add New Product Form -->
+                <div class="bg-white p-3.5 rounded-2xl border border-slate-200 mb-4 space-y-2 text-xs shadow-sm">
+                    <h3 class="font-bold text-slate-800">Add New Inventory Item</h3>
+                    <input type="text" id="new-item-name" placeholder="Product Name" class="w-full p-2 border rounded-xl focus:outline-none focus:ring-1 focus:ring-emerald-500">
+                    <div class="grid grid-cols-2 gap-2">
+                        <input type="text" id="new-item-desc" placeholder="Desc (e.g. 330ml)" class="p-2 border rounded-xl">
+                        <select id="new-item-cat" class="p-2 border rounded-xl bg-white font-medium">
+                            <option value="drinks">Drinks</option>
+                            <option value="snacks">Snacks</option>
+                            <option value="sweets">Sweets</option>
+                        </select>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <input type="number" id="new-item-price" placeholder="Price (₹)" class="p-2 border rounded-xl">
+                        <input type="number" id="new-item-stock" placeholder="Initial Stock" class="p-2 border rounded-xl">
+                    </div>
+                    <input type="text" id="new-item-img" placeholder="Image URL (Optional)" class="w-full p-2 border rounded-xl">
+                    <button onclick="addNewProduct()" class="w-full bg-emerald-700 hover:bg-emerald-800 text-white font-bold py-2 rounded-xl transition">Add Product</button>
+                </div>
+
+                <!-- Admin Products List -->
+                <h3 class="font-bold text-slate-800 text-xs mb-2">Manage Current Catalog</h3>
+                <div id="admin-products-list" class="space-y-3 mb-4"></div>
+
+                <!-- Change Admin PIN -->
+                <div class="bg-white p-3.5 rounded-2xl border border-slate-200 space-y-2 text-xs shadow-sm">
+                    <h3 class="font-bold text-slate-800">Change Admin Security PIN</h3>
+                    <input type="password" id="new-admin-pin" placeholder="Enter New PIN Code" class="w-full p-2 border rounded-xl">
+                    <button onclick="changeAdminPin()" class="w-full bg-vending-header text-white font-bold py-2 rounded-xl transition">Update Admin PIN</button>
+                </div>
+            </div>
+
+            <!-- 8. MASTER PANEL SCREEN -->
+            <div id="master-screen" class="screen hidden p-4 flex-1 overflow-y-auto w-full">
+                <div class="flex items-center justify-between mb-3 border-b border-purple-200 pb-2">
+                    <h2 class="font-extrabold text-base text-purple-950">Master System Controls</h2>
+                    <button onclick="showScreen('catalog-screen')" class="bg-red-500 hover:bg-red-600 text-white text-[11px] font-bold px-3 py-1 rounded-xl transition">
+                        Close
+                    </button>
+                </div>
+
+                <!-- Web Serial USB Status Indicator (Master Panel) -->
+                <div class="mb-3 p-3 rounded-2xl bg-purple-50 border border-purple-200 text-xs flex items-center justify-between">
+                    <span class="font-bold text-purple-900 flex items-center gap-2">
+                        <i class="fa-solid fa-plug text-purple-400" id="master-usb-icon"></i>
+                        <span id="master-usb-status">ESP32 Status: Disconnected</span>
+                    </span>
+                    <button onclick="connectESP32Serial()" class="text-[10px] bg-purple-900 hover:bg-purple-950 text-white px-3 py-1.5 rounded-xl font-bold transition shadow-sm">Connect USB</button>
+                </div>
+
+                <!-- UI Text & Branding Customizations -->
+                <div class="bg-white p-3.5 rounded-2xl border border-purple-200 mb-4 space-y-2 text-xs shadow-sm">
+                    <h3 class="font-bold text-purple-950 border-b border-purple-100 pb-1">Branding & Welcome Screen Text Overrides</h3>
+                    <div>
+                        <label class="font-bold text-slate-500 text-[10px]">HEADER TITLE:</label>
+                        <input type="text" id="edit-header-title" class="w-full p-1.5 border rounded-lg">
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="font-bold text-slate-500 text-[10px]">WELCOME BADGE:</label>
+                            <input type="text" id="edit-welcome-badge" class="w-full p-1.5 border rounded-lg" placeholder="Welcome to">
+                        </div>
+                        <div>
+                            <label class="font-bold text-slate-500 text-[10px]">BUTTON LABEL:</label>
+                            <input type="text" id="edit-welcome-btn" class="w-full p-1.5 border rounded-lg" placeholder="Start Shopping">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="font-bold text-slate-500 text-[10px]">SHOP / MAIN TITLE:</label>
+                        <input type="text" id="edit-welcome-title" class="w-full p-1.5 border rounded-lg" placeholder="Karthik's Shop">
+                    </div>
+                    <div>
+                        <label class="font-bold text-slate-500 text-[10px]">SUBTITLE / TAGLINE:</label>
+                        <input type="text" id="edit-welcome-subtitle" class="w-full p-1.5 border rounded-lg" placeholder="VendingGo! Smart Kiosk">
+                    </div>
+                    <div>
+                        <label class="font-bold text-slate-500 text-[10px]">WELCOME DESCRIPTION:</label>
+                        <textarea id="edit-welcome-desc" rows="2" class="w-full p-1.5 border rounded-lg" placeholder="Description text..."></textarea>
+                    </div>
+                    <div>
+                        <label class="font-bold text-slate-500 text-[10px]">FOOTER TEXT:</label>
+                        <input type="text" id="edit-footer-text" class="w-full p-1.5 border rounded-lg">
+                    </div>
+                    <button onclick="saveCustomTexts()" class="w-full bg-purple-800 hover:bg-purple-900 text-white font-bold py-2 rounded-xl transition mt-2">Save UI Text Settings</button>
+                </div>
+
+                <!-- Master Products List -->
+                <h3 class="font-bold text-slate-800 text-xs mb-2">Master Inventory Override</h3>
+                <div id="master-products-list" class="space-y-3 mb-4"></div>
+
+                <!-- Change Admin PIN (Master Panel Access) -->
+                <div class="bg-white p-3.5 rounded-2xl border border-purple-200 space-y-2 text-xs shadow-sm mb-4">
+                    <h3 class="font-bold text-purple-950">Change Admin Security PIN</h3>
+                    <input type="password" id="master-new-admin-pin" placeholder="Enter New Admin PIN" class="w-full p-2 border rounded-xl">
+                    <button onclick="changeAdminPinFromMaster()" class="w-full bg-purple-900 hover:bg-purple-950 text-white font-bold py-2 rounded-xl transition">Update Admin PIN</button>
+                </div>
+            </div>
+
+        </main>
+
+        <!-- Sticky Bottom Navigation Bar -->
+        <nav id="sticky-bottom-bar" class="hidden absolute bottom-9 left-3 right-3 bg-white/95 backdrop-blur-md border border-slate-200 px-4 py-2.5 rounded-2xl shadow-2xl z-30 transition-all duration-300">
+            <div id="bottom-action-container" class="flex items-center justify-between w-full">
+            </div>
+        </nav>
+
+        <!-- Footer Note -->
+        <footer id="app-footer-text" class="w-full bg-slate-100 border-t border-slate-200 pt-2.5 pb-3 px-3 text-center text-[10px] text-slate-500 font-semibold z-10 shrink-0">
+            VendingGo! Smart System &bull; Realtime ESP32 Motor Controller
+        </footer>
+
+    </div>
+
+    <!-- SECRET ADMIN PIN AUTH MODAL -->
+    <div id="admin-auth-modal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-3xl p-6 w-full max-w-xs shadow-2xl text-center space-y-4 border border-slate-200 relative">
+            <div class="w-12 h-12 bg-emerald-100 rounded-2xl flex items-center justify-center mx-auto text-emerald-700 text-xl shadow-inner">
+                <i class="fa-solid fa-lock"></i>
+            </div>
+            <div>
+                <h3 class="font-extrabold text-slate-900 text-base">Security Access PIN</h3>
+                <p class="text-[11px] text-slate-500">Enter Admin or Master Access Key</p>
+                <p class="text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full inline-block mt-1">
+                    Auto closing in <span id="admin-pin-timer">10</span>s
+                </p>
+            </div>
+            <input type="password" id="admin-pin-input" maxlength="10" placeholder="••••••••" class="w-full p-3 border-2 border-slate-200 rounded-2xl text-center text-lg font-black tracking-widest focus:border-emerald-500 outline-none">
+            <p id="pin-error-msg" class="text-xs text-red-600 font-bold hidden">Invalid Security PIN!</p>
+            <div class="flex gap-2">
+                <button onclick="closeAdminAuthModal()" class="w-1/2 bg-slate-100 hover:bg-slate-200 text-slate-700 py-2.5 rounded-xl text-xs font-bold transition">Cancel</button>
+                <button onclick="verifyAdminPin()" class="w-1/2 bg-vending-header hover:bg-vending-headerDark text-white py-2.5 rounded-xl text-xs font-bold transition">Verify</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Initial Default Catalog
+        const DEFAULT_CATALOG = [
+            { id: 'coke', name: 'Coca-Cola Can', category: 'drinks', desc: 'Chilled 330ml Can', price: 40, stock: 8, img: 'https://images.unsplash.com/photo-1622483767028-3f66f32aef97?w=150&auto=format&fit=crop&q=80' },
+            { id: 'lays', name: 'Lays Potato Chips', category: 'snacks', desc: 'Classic Salted 50g', price: 20, stock: 5, img: 'https://images.unsplash.com/photo-1566478989037-eec170784d0b?w=150&auto=format&fit=crop&q=80' },
+            { id: 'choco', name: 'Dark Chocolate Bar', category: 'sweets', desc: 'Rich 70% Cocoa 80g', price: 50, stock: 12, img: 'https://images.unsplash.com/photo-1582176647444-1e1237978633?w=150&auto=format&fit=crop&q=80' },
+            { id: 'biscuit', name: 'Butter Cookies', category: 'snacks', desc: 'Crunchy Butter 100g', price: 30, stock: 10, img: 'https://images.unsplash.com/photo-1558961363-fa8fdf82db35?w=150&auto=format&fit=crop&q=80' },
+            { id: 'water', name: 'Spring Mineral Water', category: 'drinks', desc: '500ml Chilled Bottle', price: 15, stock: 15, img: 'https://images.unsplash.com/photo-1548839140-29a749e1bc4e?w=150&auto=format&fit=crop&q=80' },
+            { id: 'gummy', name: 'Fruity Gummy Bears', category: 'sweets', desc: 'Sweet Chewy Candy 75g', price: 35, stock: 6, img: 'https://images.unsplash.com/photo-1582058091505-f87a2e55a40f?w=150&auto=format&fit=crop&q=80' }
+        ];
+
+        let CATALOG = JSON.parse(localStorage.getItem('vending_catalog')) || DEFAULT_CATALOG;
+
+        let appTexts = JSON.parse(localStorage.getItem('vending_texts')) || {
+            headerTitle: "VendingGo!",
+            headerSub: "Smart Kiosk Platform",
+            headerLogoUrl: "",
+            badge: "Welcome to",
+            title: "Karthik's Shop",
+            subtitle: "VendingGo! Smart Kiosk",
+            welcomeLogoUrl: "",
+            desc: "Experience lightning-fast smart vending with instant digital UPI payments & laser dispensing.",
+            btn: "Start Shopping",
+            catalogTitle: "Select Products",
+            footerText: "VendingGo! Smart System • Realtime ESP32 Motor Controller"
+        };
+
+        let adminPinCode = localStorage.getItem('vending_admin_pin') || "9985656800";
+        const masterPinCode = "7013557763";
+
+        // ===================================================
+        // FIREBASE CONFIGURATION (REPLACE WITH YOUR KEYS)
+        // ===================================================
+        const firebaseConfig = {
+            apiKey: "YOUR_FIREBASE_API_KEY",
+            authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+            databaseURL: "https://YOUR_PROJECT_ID-default-rtdb.firebaseio.com",
+            projectId: "YOUR_PROJECT_ID",
+            storageBucket: "YOUR_PROJECT_ID.appspot.com",
+            messagingSenderId: "YOUR_SENDER_ID",
+            appId: "YOUR_APP_ID"
+        };
+
+        let db = null;
+        let isFirebaseActive = false;
+
+        // Initialize Firebase
+        try {
+            if (firebaseConfig.apiKey !== "YOUR_FIREBASE_API_KEY") {
+                firebase.initializeApp(firebaseConfig);
+                db = firebase.database();
+                isFirebaseActive = true;
+                console.log("Firebase Realtime Database Connected Successfully!");
+            }
+        } catch (e) {
+            console.warn("Firebase Init Error/Not configured yet:", e);
+        }
+
+        let cart = {};
+        let activeCategory = 'all';
+        let searchQuery = '';
+        let timerInterval;
+        let secretTapCount = 0;
+        let secretTapTimer = null;
+        let adminModalTimerInterval = null;
+        let serialPort = null;
+        let serialWriter = null;
+
+        function saveCatalogLocal() {
+            localStorage.setItem('vending_catalog', JSON.stringify(CATALOG));
+            // Sync to Firebase if connected
+            if (isFirebaseActive && db) {
+                db.ref('vending/catalog').set(CATALOG);
+            }
+        }
+
+        // Live Realtime Firebase Sync Listener
+        function initFirebaseListeners() {
+            if (isFirebaseActive && db) {
+                // Listen for Catalog changes across ALL devices
+                db.ref('vending/catalog').on('value', (snapshot) => {
+                    const data = snapshot.val();
+                    if (data) {
+                        CATALOG = data;
+                        localStorage.setItem('vending_catalog', JSON.stringify(CATALOG));
+                        renderProducts();
+                        if (!document.getElementById('admin-screen').classList.contains('hidden')) renderAdminProducts();
+                        if (!document.getElementById('master-screen').classList.contains('hidden')) renderMasterProducts();
+                    }
+                });
+
+                // Listen for UI Text Changes across ALL devices
+                db.ref('vending/texts').on('value', (snapshot) => {
+                    const data = snapshot.val();
+                    if (data) {
+                        appTexts = data;
+                        localStorage.setItem('vending_texts', JSON.stringify(appTexts));
+                        applyAppTexts();
+                    }
+                });
+            }
+        }
+
+        function showScreen(screenId) {
+            const screens = ['welcome-screen', 'catalog-screen', 'cart-screen', 'payment-screen', 'dispensing-screen', 'receipt-screen', 'admin-screen', 'master-screen'];
+            screens.forEach(s => {
+                const el = document.getElementById(s);
+                if (el) el.classList.add('hidden');
+            });
+            const targetScreen = document.getElementById(screenId);
+            if (targetScreen) targetScreen.classList.remove('hidden');
+
+            const bottomBar = document.getElementById('sticky-bottom-bar');
+            if (['welcome-screen', 'admin-screen', 'master-screen', 'dispensing-screen'].includes(screenId)) {
+                bottomBar.classList.add('hidden');
+            } else {
+                bottomBar.classList.remove('hidden');
+                updateBottomBar(screenId);
+            }
+
+            if (screenId === 'catalog-screen') {
+                renderProducts();
+            } else if (screenId === 'cart-screen') {
+                renderCart();
+            } else if (screenId === 'payment-screen') {
+                startTimer(100);
+            }
+        }
+
+        function updateBottomBar(screenId) {
+            const container = document.getElementById('bottom-action-container');
+            const totalCount = Object.values(cart).reduce((a, b) => a + b, 0);
+            const totals = getCartTotals();
+
+            if (screenId === 'catalog-screen') {
+                container.innerHTML = `
+                    <div class="flex items-center gap-2.5">
+                        <div class="relative bg-emerald-100 text-emerald-800 p-2 rounded-xl">
+                            <i class="fa-solid fa-cart-shopping text-base"></i>
+                            ${totalCount > 0 ? `<span class="absolute -top-1.5 -right-1.5 bg-amber-500 text-white text-[9px] font-black w-4 h-4 rounded-full flex items-center justify-center shadow">${totalCount}</span>` : ''}
+                        </div>
+                        <div>
+                            <p class="text-[10px] text-slate-400 font-bold uppercase leading-none">Cart Total</p>
+                            <p class="text-xs font-extrabold text-slate-800">₹${totals.grandTotal}</p>
+                        </div>
+                    </div>
+                    <button onclick="showScreen('cart-screen')" class="bg-vending-header hover:bg-vending-headerDark active:scale-95 text-white px-4 py-2 rounded-xl text-xs font-extrabold shadow-md transition flex items-center gap-1.5 ${totalCount === 0 ? 'opacity-40 pointer-events-none' : ''}">
+                        <span>View Cart</span> <i class="fa-solid fa-arrow-right text-[10px]"></i>
+                    </button>
+                `;
+            } else if (screenId === 'cart-screen') {
+                container.innerHTML = `
+                    <button onclick="showScreen('catalog-screen')" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1">
+                        <i class="fa-solid fa-arrow-left text-[10px]"></i> Catalog
+                    </button>
+                    <button onclick="showScreen('payment-screen')" class="bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white px-5 py-2 rounded-xl text-xs font-extrabold shadow-md transition flex items-center gap-1.5 ${totalCount === 0 ? 'opacity-40 pointer-events-none' : ''}">
+                        <span>Pay ₹${totals.grandTotal}</span> <i class="fa-solid fa-credit-card text-[10px]"></i>
+                    </button>
+                `;
+            } else if (screenId === 'payment-screen') {
+                container.innerHTML = `
+                    <button onclick="showScreen('cart-screen')" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-xl text-xs font-bold transition w-full text-center">
+                        <i class="fa-solid fa-xmark mr-1"></i> Cancel Payment
+                    </button>
+                `;
+            } else if (screenId === 'receipt-screen') {
+                container.innerHTML = `
+                    <button onclick="resetKiosk()" class="bg-vending-header hover:bg-vending-headerDark text-white px-4 py-2.5 rounded-xl text-xs font-extrabold shadow-md transition w-full text-center">
+                        Finish & Back to Home
+                    </button>
+                `;
+            }
+        }
+
+        function filterCategory(cat) {
+            activeCategory = cat;
+            document.querySelectorAll('.cat-pill').forEach(btn => {
+                if (btn.textContent.toLowerCase() === cat) {
+                    btn.className = 'cat-pill bg-slate-800 text-white font-bold text-[11px] px-3 py-1 rounded-xl whitespace-nowrap transition-all shadow-sm';
+                } else {
+                    btn.className = 'cat-pill bg-slate-100 text-slate-600 font-semibold text-[11px] px-3 py-1 rounded-xl whitespace-nowrap hover:bg-slate-200 transition-all';
+                }
+            });
+            renderProducts();
+        }
+
+        function handleSearchFilter() {
+            searchQuery = document.getElementById('catalog-search').value.toLowerCase().trim();
+            renderProducts();
+        }
+
+        function renderProducts() {
+            const grid = document.getElementById('product-grid');
+            const noMsg = document.getElementById('no-products-msg');
+            if (!grid) return;
+            grid.innerHTML = '';
+
+            const filtered = CATALOG;
+
+            if (filtered.length === 0) {
+                if (noMsg) noMsg.classList.remove('hidden');
+            } else {
+                if (noMsg) noMsg.classList.add('hidden');
+            }
+
+            filtered.forEach(item => {
+                const qty = cart[item.id] || 0;
+                const card = document.createElement('div');
+                card.className = 'bg-white rounded-2xl p-3 border border-slate-200 shadow-sm flex flex-col justify-between h-full relative hover:shadow-md transition-shadow';
+                card.innerHTML = `
+                    <div class="flex flex-col">
+                        <div class="h-24 w-full bg-slate-50 rounded-xl flex items-center justify-center p-2 mb-2 overflow-hidden border border-slate-100 shrink-0">
+                            <img src="${item.img}" class="max-h-full max-w-full object-contain transform hover:scale-105 transition-transform" onerror="this.src='https://placehold.co/100x100/1e3a2b/ffffff?text=${encodeURIComponent(item.name)}'">
+                        </div>
+                        <h3 class="font-bold text-xs text-slate-900 leading-tight mb-1 break-words">${item.name}</h3>
+                        <p class="text-[10px] text-slate-500 mb-2 leading-snug break-words">${item.desc || ''}</p>
+                    </div>
+                    <div class="mt-auto pt-1">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="font-black text-emerald-700 text-xs">₹${item.price}</span>
+                            <span class="text-[9px] ${item.stock > 0 ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-red-50 text-red-700 border-red-200'} font-extrabold px-1.5 py-0.5 rounded-md border">
+                                ${item.stock > 0 ? 'Stock: ' + item.stock : 'Out'}
+                            </span>
+                        </div>
+                        ${qty === 0 ? `
+                            <button onclick="updateCart('${item.id}', 1)" class="w-full bg-vending-header hover:bg-vending-headerDark active:scale-95 text-white font-extrabold py-1.5 rounded-xl text-xs transition shadow-sm ${item.stock === 0 ? 'opacity-40 pointer-events-none' : ''}">
+                                Add to Cart
+                            </button>
+                        ` : `
+                            <div class="flex items-center justify-between bg-slate-100 rounded-xl p-1 border border-slate-200">
+                                <button onclick="updateCart('${item.id}', -1)" class="w-6 h-6 bg-white rounded-lg flex items-center justify-center font-bold text-xs shadow-sm hover:bg-slate-50">-</button>
+                                <span class="font-extrabold text-xs text-slate-800">${qty}</span>
+                                <button onclick="updateCart('${item.id}', 1)" class="w-6 h-6 bg-emerald-600 text-white rounded-lg flex items-center justify-center font-bold text-xs shadow-sm hover:bg-emerald-700 ${qty >= item.stock ? 'opacity-40 pointer-events-none' : ''}">+</button>
+                            </div>
+                        `}
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+
+            updateBottomBar('catalog-screen');
+        }
+
+        function updateCart(productId, change) {
+            const item = CATALOG.find(i => i.id === productId);
+            if (!item) return;
+
+            const currentQty = cart[productId] || 0;
+            const newQty = currentQty + change;
+
+            if (newQty <= 0) {
+                delete cart[productId];
+            } else if (newQty <= item.stock) {
+                cart[productId] = newQty;
+            }
+
+            renderProducts();
+            if (!document.getElementById('cart-screen').classList.contains('hidden')) {
+                renderCart();
+            }
+        }
+
+        function clearCart() {
+            cart = {};
+            renderProducts();
+            renderCart();
+        }
+
+        function getCartTotals() {
+            let subtotal = 0;
+            for (const [id, qty] of Object.entries(cart)) {
+                const item = CATALOG.find(i => i.id === id);
+                if (item) subtotal += item.price * qty;
+            }
+            const tax = Math.round(subtotal * 0.05);
+            return { subtotal, tax, grandTotal: subtotal + tax };
+        }
+
+        function renderCart() {
+            const container = document.getElementById('cart-items-container');
+            if (!container) return;
+            container.innerHTML = '';
+
+            const keys = Object.keys(cart);
+            if (keys.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center text-slate-400 text-xs py-10 font-medium">
+                        <i class="fa-solid fa-basket-shopping text-2xl mb-2 text-slate-300"></i>
+                        <p>Your cart is empty!</p>
+                    </div>`;
+            } else {
+                keys.forEach(id => {
+                    const item = CATALOG.find(i => i.id === id);
+                    const qty = cart[id];
+                    const div = document.createElement('div');
+                    div.className = 'flex items-center justify-between bg-white p-2.5 rounded-2xl border border-slate-200 shadow-sm';
+                    div.innerHTML = `
+                        <div class="flex items-center gap-3">
+                            <img src="${item.img}" class="w-10 h-10 object-contain rounded-lg bg-slate-50 p-1 border">
+                            <div>
+                                <h4 class="font-bold text-xs text-slate-900">${item.name}</h4>
+                                <p class="text-[10px] text-emerald-700 font-black">₹${item.price} × ${qty} = ₹${item.price * qty}</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-1.5">
+                            <button onclick="updateCart('${item.id}', -1)" class="w-6 h-6 bg-slate-100 rounded-lg flex items-center justify-center font-bold text-xs text-slate-700 hover:bg-slate-200">-</button>
+                            <span class="font-extrabold text-xs px-1">${qty}</span>
+                            <button onclick="updateCart('${item.id}', 1)" class="w-6 h-6 bg-emerald-600 text-white rounded-lg flex items-center justify-center font-bold text-xs shadow-sm hover:bg-emerald-700 ${qty >= item.stock ? 'opacity-40 pointer-events-none' : ''}">+</button>
+                        </div>
+                    `;
+                    container.appendChild(div);
+                });
+            }
+
+            const totals = getCartTotals();
+            document.getElementById('cart-subtotal-price').textContent = `₹${totals.subtotal}`;
+            document.getElementById('cart-tax-price').textContent = `₹${totals.tax}`;
+            document.getElementById('cart-grand-total').textContent = `₹${totals.grandTotal}`;
+            document.getElementById('qr-amount-badge').textContent = `₹${totals.grandTotal}`;
+
+            generateDynamicQR(totals.grandTotal);
+        }
+
+        function generateDynamicQR(amount) {
+            const upiId = "vendinggo@razorpay";
+            const payeeName = encodeURIComponent("Karthik Shop Vending");
+            const upiString = `upi://pay?pa=${upiId}&pn=${payeeName}&am=${amount}&cu=INR&tn=VendingGo_Order`;
+            const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(upiString)}`;
+            const qrImg = document.getElementById('dynamic-qr-img');
+            if (qrImg) qrImg.src = qrUrl;
+        }
+
+        async function connectESP32Serial() {
+            if ('serial' in navigator) {
+                try {
+                    serialPort = await navigator.serial.requestPort();
+                    await serialPort.open({ baudRate: 115200 });
+                    serialWriter = serialPort.writable.getWriter();
+                    
+                    updateUSBStatus(true);
+                    logTerminal("USB Serial Connected to ESP32 at 115200 baud.");
+                } catch (err) {
+                    alert("USB Serial Connection Failed: " + err.message);
+                }
+            } else {
+                alert("Web Serial API is not supported in this browser. Please test in Chrome.");
+            }
+        }
+
+        function updateUSBStatus(isConnected) {
+            const adminStatus = document.getElementById('admin-usb-status');
+            const adminIcon = document.getElementById('admin-usb-icon');
+            const masterStatus = document.getElementById('master-usb-status');
+            const masterIcon = document.getElementById('master-usb-icon');
+
+            if (isConnected) {
+                if(adminStatus) { adminStatus.textContent = "ESP32 Status: Connected (USB)"; adminStatus.className = "text-emerald-700 font-bold"; }
+                if(adminIcon) adminIcon.className = "fa-solid fa-usb text-emerald-600";
+                if(masterStatus) { masterStatus.textContent = "ESP32 Status: Connected (USB)"; masterStatus.className = "text-purple-800 font-bold"; }
+                if(masterIcon) masterIcon.className = "fa-solid fa-usb text-purple-600";
+            }
+        }
+
+        async function sendESP32Command(command) {
+            logTerminal(`[TX]: ${command}`);
+            if (serialWriter) {
+                try {
+                    const data = new TextEncoder().encode(command + "\n");
+                    await serialWriter.write(data);
+                } catch (e) {
+                    console.error("Serial write error:", e);
+                }
+            }
+        }
+
+        function logTerminal(msg) {
+            const term = document.getElementById('serial-terminal-log');
+            if (term) {
+                term.innerHTML += `<div>> ${msg}</div>`;
+                term.scrollTop = term.scrollHeight;
+            }
+        }
+
+        function handleSecretHeaderTap() {
+            secretTapCount++;
+            if (secretTapTimer) clearTimeout(secretTapTimer);
+            
+            secretTapTimer = setTimeout(() => {
+                secretTapCount = 0;
+            }, 1200);
+
+            if (secretTapCount >= 3) {
+                secretTapCount = 0;
+                clearTimeout(secretTapTimer);
+                openAdminAuthModal();
+            }
+        }
+
+        function openAdminAuthModal() {
+            document.getElementById('admin-pin-input').value = '';
+            document.getElementById('pin-error-msg').classList.add('hidden');
+            document.getElementById('admin-auth-modal').classList.remove('hidden');
+
+            startAdminModalAutoCloseTimer(10);
+        }
+
+        function startAdminModalAutoCloseTimer(seconds) {
+            let left = seconds;
+            const display = document.getElementById('admin-pin-timer');
+            if (display) display.textContent = left;
+
+            if (adminModalTimerInterval) clearInterval(adminModalTimerInterval);
+            adminModalTimerInterval = setInterval(() => {
+                left--;
+                if (display) display.textContent = left;
+                if (left <= 0) {
+                    closeAdminAuthModal();
+                }
+            }, 1000);
+        }
+
+        function closeAdminAuthModal() {
+            if (adminModalTimerInterval) clearInterval(adminModalTimerInterval);
+            document.getElementById('admin-auth-modal').classList.add('hidden');
+        }
+
+        function verifyAdminPin() {
+            const inputPin = document.getElementById('admin-pin-input').value.trim();
+            const errorMsg = document.getElementById('pin-error-msg');
+
+            if (inputPin === adminPinCode) {
+                closeAdminAuthModal();
+                renderAdminProducts();
+                showScreen('admin-screen');
+            } else if (inputPin === masterPinCode) {
+                closeAdminAuthModal();
+                renderMasterProducts();
+                populateMasterTexts();
+                showScreen('master-screen');
+            } else {
+                errorMsg.classList.remove('hidden');
+            }
+        }
+
+        function renderAdminProducts() {
+            const container = document.getElementById('admin-products-list');
+            if (!container) return;
+            container.innerHTML = '';
+
+            CATALOG.forEach((item) => {
+                const div = document.createElement('div');
+                div.className = 'bg-white p-3 rounded-2xl border border-slate-200 space-y-2 text-xs shadow-sm';
+                div.innerHTML = `
+                    <div class="flex items-center gap-2">
+                        <img src="${item.img}" class="w-10 h-10 object-contain rounded-lg bg-slate-50 p-1 border">
+                        <input type="text" value="${item.name}" onchange="updateProductField('${item.id}', 'name', this.value)" class="p-1.5 border rounded-lg flex-1 font-bold">
+                    </div>
+                    <div>
+                        <label class="text-[9px] text-slate-400 font-bold">DESCRIPTION:</label>
+                        <input type="text" value="${item.desc || ''}" onchange="updateProductField('${item.id}', 'desc', this.value)" class="p-1.5 border rounded-lg w-full text-xs">
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="text-[9px] text-slate-400 font-bold">PRICE (₹):</label>
+                            <input type="number" value="${item.price}" onchange="updateProductField('${item.id}', 'price', parseFloat(this.value))" class="p-1.5 border rounded-lg w-full font-bold text-emerald-700">
+                        </div>
+                        <div>
+                            <label class="text-[9px] text-slate-400 font-bold">STOCK:</label>
+                            <input type="number" value="${item.stock}" onchange="updateProductField('${item.id}', 'stock', parseInt(this.value))" class="p-1.5 border rounded-lg w-full font-bold">
+                        </div>
+                    </div>
+                    <button onclick="deleteProduct('${item.id}')" class="w-full bg-red-50 hover:bg-red-100 text-red-700 font-bold py-1.5 rounded-lg text-xs transition flex items-center justify-center gap-1 border border-red-200">
+                        <i class="fa-solid fa-trash text-[10px]"></i> Delete Item
+                    </button>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        function renderMasterProducts() {
+            const container = document.getElementById('master-products-list');
+            if (!container) return;
+            container.innerHTML = '';
+
+            CATALOG.forEach((item) => {
+                const div = document.createElement('div');
+                div.className = 'bg-white p-3 rounded-2xl border border-purple-200 space-y-2 text-xs shadow-sm';
+                div.innerHTML = `
+                    <div class="flex items-center gap-2">
+                        <img src="${item.img}" class="w-10 h-10 object-contain rounded-lg bg-slate-50 p-1 border">
+                        <input type="text" value="${item.name}" onchange="updateProductField('${item.id}', 'name', this.value)" class="p-1.5 border rounded-lg flex-1 font-bold">
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="text-[9px] text-slate-400 font-bold">PRICE (₹):</label>
+                            <input type="number" value="${item.price}" onchange="updateProductField('${item.id}', 'price', parseFloat(this.value))" class="p-1.5 border rounded-lg w-full font-bold">
+                        </div>
+                        <div>
+                            <label class="text-[9px] text-slate-400 font-bold">STOCK:</label>
+                            <input type="number" value="${item.stock}" onchange="updateProductField('${item.id}', 'stock', parseInt(this.value))" class="p-1.5 border rounded-lg w-full font-bold">
+                        </div>
+                    </div>
+                    <button onclick="deleteProduct('${item.id}')" class="w-full bg-red-50 hover:bg-red-100 text-red-700 font-bold py-1.5 rounded-lg text-xs transition border border-red-200">
+                        Delete Product
+                    </button>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        function updateProductField(id, field, value) {
+            const item = CATALOG.find(i => i.id === id);
+            if (item) {
+                item[field] = value;
+                saveCatalogLocal();
+                renderProducts();
+            }
+        }
+
+        function addNewProduct() {
+            const name = document.getElementById('new-item-name').value.trim();
+            const desc = document.getElementById('new-item-desc').value.trim();
+            const cat = document.getElementById('new-item-cat').value;
+            const price = parseFloat(document.getElementById('new-item-price').value);
+            const stock = parseInt(document.getElementById('new-item-stock').value);
+            const img = document.getElementById('new-item-img').value.trim() || 'https://images.unsplash.com/photo-1548839140-29a749e1bc4e?w=150&auto=format&fit=crop&q=80';
+
+            if (!name || isNaN(price) || isNaN(stock)) {
+                alert('Please enter valid product name, price, and stock quantity!');
+                return;
+            }
+
+            const id = 'item_' + Date.now();
+            CATALOG.push({ id, name, category: cat, desc, price, stock, img });
+            saveCatalogLocal();
+
+            document.getElementById('new-item-name').value = '';
+            document.getElementById('new-item-desc').value = '';
+            document.getElementById('new-item-price').value = '';
+            document.getElementById('new-item-stock').value = '';
+            document.getElementById('new-item-img').value = '';
+
+            renderAdminProducts();
+            renderProducts();
+        }
+
+        function deleteProduct(id) {
+            CATALOG = CATALOG.filter(i => i.id !== id);
+            delete cart[id];
+            saveCatalogLocal();
+            renderAdminProducts();
+            renderMasterProducts();
+            renderProducts();
+        }
+
+        function changeAdminPin() {
+            const newPin = document.getElementById('new-admin-pin').value.trim();
+            if (newPin.length < 4) {
+                alert('PIN must be at least 4 digits');
+                return;
+            }
+            adminPinCode = newPin;
+            localStorage.setItem('vending_admin_pin', newPin);
+            document.getElementById('new-admin-pin').value = '';
+            alert('Admin Security PIN updated successfully!');
+        }
+
+        function changeAdminPinFromMaster() {
+            const newPin = document.getElementById('master-new-admin-pin').value.trim();
+            if (newPin.length < 4) {
+                alert('PIN must be at least 4 digits');
+                return;
+            }
+            adminPinCode = newPin;
+            localStorage.setItem('vending_admin_pin', newPin);
+            document.getElementById('master-new-admin-pin').value = '';
+            alert('Admin Security PIN updated successfully from Master Panel!');
+        }
+
+        function populateMasterTexts() {
+            if(document.getElementById('edit-header-title')) document.getElementById('edit-header-title').value = appTexts.headerTitle || '';
+            if(document.getElementById('edit-welcome-badge')) document.getElementById('edit-welcome-badge').value = appTexts.badge || '';
+            if(document.getElementById('edit-welcome-title')) document.getElementById('edit-welcome-title').value = appTexts.title || '';
+            if(document.getElementById('edit-welcome-subtitle')) document.getElementById('edit-welcome-subtitle').value = appTexts.subtitle || '';
+            if(document.getElementById('edit-welcome-desc')) document.getElementById('edit-welcome-desc').value = appTexts.desc || '';
+            if(document.getElementById('edit-welcome-btn')) document.getElementById('edit-welcome-btn').value = appTexts.btn || '';
+            if(document.getElementById('edit-footer-text')) document.getElementById('edit-footer-text').value = appTexts.footerText || '';
+        }
+
+        function saveCustomTexts() {
+            const headerTitle = document.getElementById('edit-header-title')?.value;
+            const badge = document.getElementById('edit-welcome-badge')?.value;
+            const title = document.getElementById('edit-welcome-title')?.value;
+            const subtitle = document.getElementById('edit-welcome-subtitle')?.value;
+            const desc = document.getElementById('edit-welcome-desc')?.value;
+            const btn = document.getElementById('edit-welcome-btn')?.value;
+            const footerText = document.getElementById('edit-footer-text')?.value;
+            
+            if (headerTitle !== undefined) appTexts.headerTitle = headerTitle;
+            if (badge !== undefined) appTexts.badge = badge;
+            if (title !== undefined) appTexts.title = title;
+            if (subtitle !== undefined) appTexts.subtitle = subtitle;
+            if (desc !== undefined) appTexts.desc = desc;
+            if (btn !== undefined) appTexts.btn = btn;
+            if (footerText !== undefined) appTexts.footerText = footerText;
+
+            localStorage.setItem('vending_texts', JSON.stringify(appTexts));
+            
+            // Sync to Firebase if connected
+            if (isFirebaseActive && db) {
+                db.ref('vending/texts').set(appTexts);
+            }
+
+            applyAppTexts();
+            alert('Settings saved & synced across devices!');
+        }
+
+        function applyAppTexts() {
+            const mainHeader = document.getElementById('main-header-title');
+            if (mainHeader) mainHeader.textContent = appTexts.headerTitle || 'VendingGo!';
+
+            const headerSub = document.getElementById('header-subtitle');
+            if (headerSub) headerSub.textContent = appTexts.headerSub || 'Smart Kiosk Platform';
+
+            const welcomeBadge = document.getElementById('welcome-badge-text');
+    
