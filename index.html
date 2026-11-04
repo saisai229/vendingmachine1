@@ -790,7 +790,7 @@
         }
 
         function generateDynamicQR(amount) {
-            const upiId = "";
+            const upiId = "9985656800-2ybl";
             const payeeName = encodeURIComponent("Karthik Shop Vending");
             const upiString = `upi://pay?pa=${upiId}&pn=${payeeName}&am=${amount}&cu=INR&tn=VendingGo_Order`;
             const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(upiString)}`;
